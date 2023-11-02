@@ -82,18 +82,18 @@ WSGI_APPLICATION = 'app.wsgi.application'
 
 DATABASES = {
     'default': {
-       # 'ENGINE': 'django.db.backends.sqlite3',
-       # 'NAME': BASE_DIR / 'db.sqlite3',
-       'ENGINE': 'django.db.backends.postgresql_psycopg2',
-       'HOST': env_config('PG_HOST'),
-       'NAME': 'odk-reader',
-       'USER': env_config('PG_USER'),
-       'PASSWORD': env_config('PG_PASSWORD'),
-       'PORT': '5432',
-       'OPTIONS': {
-            'sslmode': 'require',
-            'target_session_attrs': 'read-write',
-        },
+       'ENGINE': 'django.db.backends.sqlite3',
+       'NAME': BASE_DIR / 'db.sqlite3',
+    #    'ENGINE': 'django.db.backends.postgresql_psycopg2',
+    #    'HOST': env_config('PG_HOST'),
+    #    'NAME': 'odk-reader',
+    #    'USER': env_config('PG_USER'),
+    #    'PASSWORD': env_config('PG_PASSWORD'),
+    #    'PORT': '5432',
+    #    'OPTIONS': {
+    #         'sslmode': 'require',
+    #         'target_session_attrs': 'read-write',
+    #     },
      #   postgres://xavierfrancisco353:A6b2DqYBniXw@ep-throbbing-heart-50387528.us-east-2.aws.neon.tech/inquerito
     }
 }

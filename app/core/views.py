@@ -6,6 +6,8 @@ from dotenv import load_dotenv
 import xml.etree.ElementTree as ET
 import boto3
 from .models import *  # Im
+import pandas as pd
+import sqlite3
 
 load_dotenv()
 
@@ -44,6 +46,18 @@ def process_xml_files_and_upload_to_db():
             hora_inquerito = get_text('hora_inquerito')
             observacoes = get_text('observacao')
             meta_instanceID = get_text('meta/instanceID')
+
+            # Checking if Inquerito object with similar attributes already exists
+            existing_inquerito = Inquerito.objects.filter(
+                data_inquerito=data_inquerito,
+                hora_inquerito=hora_inquerito,
+                meta_instanceID=meta_instanceID
+            ).first()
+            
+            if existing_inquerito:
+                print(f"Skipping file {filename} as similar Inquerito already exists.")
+                continue
+
             if data_inquerito and hora_inquerito:
                 inquerito = Inquerito(
                     data_inquerito=data_inquerito,
@@ -177,6 +191,107 @@ def process_xml_files_and_upload_to_db():
                         deficiencia_fisica_mental=deficiencia_fisica_mental
                     )
                     membro.save()
+
+            # Processing IdentificacaoPropNegocio section
+            propriedade_negocio_data = root.find('identificacao_prop_negocio')
+            if propriedade_negocio_data:
+                solucao_adoptar = get_text('solucao_adoptar', propriedade_negocio_data)
+                data_nascimento_prop_negocio = get_text('data_nascimento_prop_negocio', propriedade_negocio_data)
+                contacto_prop_negocio = get_text('contacto_prop_negocio', propriedade_negocio_data)
+                doc_identificacao_prop_negocio = get_text('doc_identificacao_prop_negocio', propriedade_negocio_data)
+                outro_doc_ident_prop_negocio = get_text('outro_doc_ident_prop_negocio', propriedade_negocio_data)
+                photo_prop_negocio = upload_image_to_s3(get_text('photo_prop_negocio', propriedade_negocio_data), directory_path)
+                bairro_vive_prop_negocio = get_text('bairro_vive_prop_negocio', propriedade_negocio_data)
+                bairro_localizacao_negocio = get_text('bairro_localizacao_negocio', propriedade_negocio_data)
+                numero_senha_localizacao_negocio_gmaps = get_text('numero_senha_localizacao_negocio_gmaps', propriedade_negocio_data)
+                coordenadas_estabelecimento_comercial = get_text('coordenadas_estabelecimento_comercial', propriedade_negocio_data)
+                nome_comercial_negocio = get_text('nome_comercial_negocio', propriedade_negocio_data)
+                tipo_negocio = get_text('tipo_negocio', propriedade_negocio_data)
+                outro_tipo_negocio = get_text('outro_tipo_negocio', propriedade_negocio_data)
+                proprietario_estrutura_comercial = get_text('proprietario_estrutura_comercial', propriedade_negocio_data)
+                como_conseguiu_estrutura_comercial = get_text('como_conseguiu_estrutura_comercial', propriedade_negocio_data)
+                outra_forma_conseguiu_est_comercial = get_text('outra_forma_conseguiu_est_comercial', propriedade_negocio_data)
+                tempo_que_possui_estrutura_comercial = get_text('tempo_que_possui_estrutura_comercial', propriedade_negocio_data)
+                tem_documento_que_confirma_propriedade_estabelecimento = get_text('tem_documento_que_confirma_propriedade_estabelecimento', propriedade_negocio_data)
+                outro_doc_confirma_prop_estabelecimento = get_text('outro_doc_confirma_prop_estabelecimento', propriedade_negocio_data)
+                foto_documento_estabelecimento = upload_image_to_s3(get_text('foto_documento_estabelecimento', propriedade_negocio_data), directory_path)
+                tipo_material_construcao_estab_comercial_piso = get_text('tipo_material_construcao_estab_comercial_piso', propriedade_negocio_data)
+                outro_tipo_material_est_come_piso = get_text('outro_tipo_material_est_come_piso', propriedade_negocio_data)
+                tipo_material_construcao_estab_comercial_parede = get_text('tipo_material_construcao_estab_comercial_parede', propriedade_negocio_data)
+                outro_tipo_material_est_come_parede = get_text('outro_tipo_material_est_come_parede', propriedade_negocio_data)
+                tipo_material_construcao_estab_comercial_tecto = get_text('tipo_material_construcao_estab_comercial_tecto', propriedade_negocio_data)
+                outro_tipo_material_construcao_tecto = get_text('outro_tipo_material_construcao_tecto', propriedade_negocio_data)
+                tem_trabalhadores_envolvidos_negocio = get_text('tem_trabalhadores_envolvidos_negocio', propriedade_negocio_data)
+                numero_trabalhadores = get_text('numero_trabalhadores', propriedade_negocio_data)
+                valor_inicial_investido_no_seu_negocio = get_text('valor_inicial_investido_no_seu_negocio', propriedade_negocio_data)
+                outro_valor_inicial_no_seu_negocio = get_text('outro_valor_inicial_no_seu_negocio', propriedade_negocio_data)
+                rendimento_bruto_mensal_negocio = get_text('rendimento_bruto_mensal_negocio', propriedade_negocio_data)
+                outro_rendimento_bruto_mensal_negocio = get_text('outro_rendimento_bruto_mensal_negocio', propriedade_negocio_data)
+                lucro_medio_mensal_negocio = get_text('lucro_medio_mensal_negocio', propriedade_negocio_data)
+                outro_lucro_medio_mensal_negocio = get_text('outro_lucro_medio_mensal_negocio', propriedade_negocio_data)
+                outras_fontes_renda_negocio = get_text('outras_fontes_renda_negocio', propriedade_negocio_data)
+                
+                propriedade_negocio = IdentificacaoPropNegocio(
+                    inquerito=inquerito,
+                    solucao_adoptar=solucao_adoptar,
+                    data_nascimento_prop_negocio=data_nascimento_prop_negocio,
+                    contacto_prop_negocio=contacto_prop_negocio,
+                    doc_identificacao_prop_negocio=doc_identificacao_prop_negocio,
+                    outro_doc_ident_prop_negocio=outro_doc_ident_prop_negocio,
+                    photo_prop_negocio=photo_prop_negocio,
+                    bairro_vive_prop_negocio=bairro_vive_prop_negocio,
+                    bairro_localizacao_negocio=bairro_localizacao_negocio,
+                    numero_senha_localizacao_negocio_gmaps=numero_senha_localizacao_negocio_gmaps,
+                    coordenadas_estabelecimento_comercial=coordenadas_estabelecimento_comercial,
+                    nome_comercial_negocio=nome_comercial_negocio,
+                    tipo_negocio=tipo_negocio,
+                    outro_tipo_negocio=outro_tipo_negocio,
+                    proprietario_estrutura_comercial=proprietario_estrutura_comercial,
+                    como_conseguiu_estrutura_comercial=como_conseguiu_estrutura_comercial,
+                    outra_forma_conseguiu_est_comercial=outra_forma_conseguiu_est_comercial,
+                    tempo_que_possui_estrutura_comercial=tempo_que_possui_estrutura_comercial,
+                    tem_documento_que_confirma_propriedade_estabelecimento=tem_documento_que_confirma_propriedade_estabelecimento,
+                    outro_doc_confirma_prop_estabelecimento=outro_doc_confirma_prop_estabelecimento,
+                    foto_documento_estabelecimento=foto_documento_estabelecimento,
+                    tipo_material_construcao_estab_comercial_piso=tipo_material_construcao_estab_comercial_piso,
+                    outro_tipo_material_est_come_piso=outro_tipo_material_est_come_piso,
+                    tipo_material_construcao_estab_comercial_parede=tipo_material_construcao_estab_comercial_parede,
+                    outro_tipo_material_est_come_parede=outro_tipo_material_est_come_parede,
+                    tipo_material_construcao_estab_comercial_tecto=tipo_material_construcao_estab_comercial_tecto,
+                    outro_tipo_material_construcao_tecto=outro_tipo_material_construcao_tecto,
+                    tem_trabalhadores_envolvidos_negocio=tem_trabalhadores_envolvidos_negocio,
+                    numero_trabalhadores=numero_trabalhadores,
+                    valor_inicial_investido_no_seu_negocio=valor_inicial_investido_no_seu_negocio,
+                    outro_valor_inicial_no_seu_negocio=outro_valor_inicial_no_seu_negocio,
+                    rendimento_bruto_mensal_negocio=rendimento_bruto_mensal_negocio,
+                    outro_rendimento_bruto_mensal_negocio=outro_rendimento_bruto_mensal_negocio,
+                    lucro_medio_mensal_negocio=lucro_medio_mensal_negocio,
+                    outro_lucro_medio_mensal_negocio=outro_lucro_medio_mensal_negocio,
+                    outras_fontes_renda_negocio=outras_fontes_renda_negocio
+                )
+                propriedade_negocio.save()
+
+            # Processing Expectativa compenscao Prop negocio section
+            expectativa_compensacao_negocio_data = root.find('expectativa_compensacao_prop_negocio')
+            if expectativa_compensacao_negocio_data:
+                compensacao_esperada_negocio = get_text('compensacao_esperada_negocio', expectativa_compensacao_negocio_data)
+                localizacao_estrutura_receber = get_text('localizacao_estrutura_receber', expectativa_compensacao_negocio_data)
+                outro_localizacao_estrutura_receber = get_text('outro_localizacao_estrutura_receber', expectativa_compensacao_negocio_data)
+                outra_compensacao_esperada_negocio = get_text('outra_compensacao_esperada_negocio', expectativa_compensacao_negocio_data)
+                foto_estrutura_receber = upload_image_to_s3(get_text('foto_estrutura_receber', expectativa_compensacao_negocio_data), directory_path)
+                termo_consentimento_estrutura_negocio = upload_image_to_s3(get_text('termo_consentimento_estrutura_negocio', expectativa_compensacao_negocio_data), directory_path)
+                
+                expectativa_compensacao_negocio = ExpectativaCompensacaoNegocio(
+                    inquerito=inquerito,
+                    compensacao_esperada_negocio=compensacao_esperada_negocio,
+                    localizacao_estrutura_receber=localizacao_estrutura_receber,
+                    outro_localizacao_estrutura_receber=outro_localizacao_estrutura_receber,
+                    outra_compensacao_esperada_negocio=outra_compensacao_esperada_negocio,
+                    foto_estrutura_receber=foto_estrutura_receber,
+                    termo_consentimento_estrutura_negocio=termo_consentimento_estrutura_negocio
+                )
+                expectativa_compensacao_negocio.save()
+
 
             # Processing PatrimonioRendaConsumo section
             patrimonio_data = root.find('patrimonio_renda_consumo')
@@ -464,14 +579,344 @@ def process_xml_files_and_upload_to_db():
                     expectativas_tratamento.save()
 
 
+def process_xml_files_insert_new_data_and_upload_to_db():
+    print("Processing XML files...")
+    directory_path = "C:\Docs\consolidated"
+    
+    for filename in os.listdir(directory_path):
+        if filename.endswith('.xml'):
+            tree = ET.parse(os.path.join(directory_path, filename))
+            root = tree.getroot()
+
+            # Generic function to get text from an element
+            def get_text(element_name, parent_element=root, default=None):
+                elem = parent_element.find(element_name)
+                return elem.text if elem is not None else default
+            
+            # Extracting data for main Inquerito model
+            data_inquerito = get_text('data_inquerito')
+            hora_inquerito = get_text('hora_inquerito')
+            observacoes = get_text('observacao')
+            meta_instanceID = get_text('meta/instanceID')
+
+            # Checking if Inquerito object with similar attributes already exists
+            existing_inquerito = Inquerito.objects.filter(
+                data_inquerito=data_inquerito,
+                hora_inquerito=hora_inquerito,
+                meta_instanceID=meta_instanceID
+            ).first()
+            
+            # Update estruturas habitacionais
+            estruturas_habitacionais_data = root.find('estruturas_habitacionais')
+            # if estruturas_habitacionais_data is not None:
+            #     a_obra_e = get_text('a_obra_e', estruturas_habitacionais_data)
+            #     a_igreja_e = get_text('a_igreja_e', estruturas_habitacionais_data)
+
+            estruturas_habitacionais = EstruturasHabitacionais.objects.filter(
+                inquerito=existing_inquerito
+            ).first()
+
+             # Processing IdentificacaoAggFamiliar section
+            agg_familiar_data = root.find('identificacao_agg_familiar')
+            if agg_familiar_data:
+                codigo_igreja = get_text('codigo_igreja', agg_familiar_data)
+                codigo_machamba = get_text('codigo_machamba', agg_familiar_data)
+               
+                existing_aggregado_familiar = IdentificacaoAggFamiliar.objects.filter(
+                    inquerito=existing_inquerito
+                ).first()
+                if existing_aggregado_familiar:
+                    print('Found IdentificacaoAggFamiliar', existing_aggregado_familiar.id)
+                    existing_aggregado_familiar.codigo_igreja = codigo_igreja
+                    existing_aggregado_familiar.codigo_machamba = codigo_machamba
+                    existing_aggregado_familiar.save() 
+              
 
 
+            #if estruturas_habitacionais:
+               # print('Found EstruturasHabitacionais', estruturas_habitacionais.id)
+                # estruturas_habitacionais.a_obra_e = a_obra_e
+                # estruturas_habitacionais.a_igreja_e = a_igreja_e
+                # estruturas_habitacionais.save()
 
+             # Insert estrutaras_talhaos
+            
+            # if estruturas_habitacionais_data is not None:
+            #     for estruturas_talhaos_data in estruturas_habitacionais_data.findall('estruturas_talhaos'):
+            #         print('Processing EstruturasTalhaos...')
+            #         estruturas_talhao = get_text('estruturas_talhao', estruturas_talhaos_data)
+            #         estrutura_sera_afectada = get_text('estrutura_sera_afectada', estruturas_talhaos_data)
+            #         codigo_estrutura_afectada = get_text('codigo_estrutura_afectada', estruturas_talhaos_data)
+            #         numero_divisoes = get_text('numero_divisoes', estruturas_talhaos_data)
+            #         if numero_divisoes:
+            #             numero_divisoes = int(numero_divisoes)
+            #         nivel_afectacao_estrutura = get_text('nivel_afectacao_estrutura', estruturas_talhaos_data)
+            #         comprimento = get_text('comprimento', estruturas_talhaos_data)
+            #         if comprimento:
+            #             comprimento = float(comprimento)
+            #         largura = get_text('largura', estruturas_talhaos_data)
+            #         if largura:
+            #             largura = float(largura)
+            #         material_cobertura_estruturas = get_text('material_cobertura_estruturas', estruturas_talhaos_data)
+            #         outro_material_tecto = get_text('outro_material_tecto', estruturas_talhaos_data)
+            #         material_das_paredes = get_text('material_das_paredes', estruturas_talhaos_data)
+            #         material_de_soalho_das_estruturas = get_text('material_de_soalho_das_estruturas', estruturas_talhaos_data)
+            #         outro_material_soalho = get_text('outro_material_soalho', estruturas_talhaos_data)
+            #         foto_esboco = upload_image_to_s3(get_text('foto_esboco', estruturas_talhaos_data), directory_path)
+
+                    # Check if EstruturasTalhaos with all attributes already exists
+                    # existing_estruturas_talhaos = EstruturasTalhaos.objects.filter(
+                    #   #  estruturas_habitacionais=estruturas_habitacionais,  # Assumed you have an estruturas_habitacionais instance
+                    #     estruturas_talhao=estruturas_talhao,
+                    #     estrutura_sera_afectada=estrutura_sera_afectada,
+                    #     codigo_estrutura_afectada=codigo_estrutura_afectada,
+                    #     numero_divisoes=numero_divisoes,
+                    #     nivel_afectacao_estrutura=nivel_afectacao_estrutura,
+                    #     comprimento=comprimento,
+                    #     largura=largura,
+                    #   #  material_cobertura_estruturas=material_cobertura_estruturas,
+                    #   #  outro_material_tecto=outro_material_tecto,
+                    #    # material_das_paredes=material_das_paredes,
+                    #    # material_de_soalho_das_estruturas=material_de_soalho_das_estruturas,
+                    #    # outro_material_soalho=outro_material_soalho
+                    # ).first()
+
+                    # if existing_estruturas_talhaos:
+                    #     print(f"EstruturasTalhaos with specified attributes already exists. Skipping insertion.")
+                    #     continue  # Skip to the next estruturas_talhaos or next section
+
+                    # estruturas_talhaos = EstruturasTalhaos(
+                    #     estruturas_habitacionais=estruturas_habitacionais,  # Assuming you've created an instance of EstruturasHabitacionais before this
+                    #     estruturas_talhao=estruturas_talhao,
+                    #     estrutura_sera_afectada=estrutura_sera_afectada,
+                    #     codigo_estrutura_afectada=codigo_estrutura_afectada,
+                    #     numero_divisoes=numero_divisoes,
+                    #     nivel_afectacao_estrutura=nivel_afectacao_estrutura,
+                    #     comprimento=comprimento,
+                    #     largura=largura,
+                    #     material_cobertura_estruturas=material_cobertura_estruturas,
+                    #     outro_material_tecto=outro_material_tecto,
+                    #     material_das_paredes=material_das_paredes,
+                    #     material_de_soalho_das_estruturas=material_de_soalho_das_estruturas,
+                    #     outro_material_soalho=outro_material_soalho,
+                    #     foto_esboco=foto_esboco
+                    # )
+                    # try:
+                    #    estruturas_talhaos.save()
+                    #    print('Saving EstruturasTalhaos', estruturas_talhaos.id)
+                    # except Exception as e:
+                    #     print(f"Error saving EstruturasTalhaos: {e}")
+                    # patrimonio_data = root.find('patrimonio_renda_consumo')
+                    # if patrimonio_data:
+                    #     familia_possui_bens = get_text('familia_possui_bens', patrimonio_data)
+                    #     numero_de_fontes_de_renda = get_text('numero_de_fontes_de_renda', patrimonio_data)
+                    #     if numero_de_fontes_de_renda:
+                    #         numero_de_fontes_de_renda = int(numero_de_fontes_de_renda)
+                    #     principais_fontes_de_rendas_count = get_text('principais_fontes_de_rendas_count', patrimonio_data)
+                    #     if principais_fontes_de_rendas_count:
+                    #         principais_fontes_de_rendas_count = int(principais_fontes_de_rendas_count)
+                    #     principais_fontes_de_rendas = get_text('principais_fontes_de_rendas', patrimonio_data)
+                    #     renda_media_mensal = get_text('renda_media_mensal', patrimonio_data)
+                    #     if familia_possui_bens:
+                    #         existing_patrimonio = PatrimonioRendaConsumo.objects.filter(
+                    #             inquerito=existing_inquerito,
+                    #             familia_possui_bens=familia_possui_bens,
+                    #             numero_de_fontes_de_renda=numero_de_fontes_de_renda,
+                    #             principais_fontes_de_rendas_count=principais_fontes_de_rendas_count,
+                    #             principais_fontes_de_rendas=principais_fontes_de_rendas,
+                    #             renda_media_mensal=renda_media_mensal
+                    #         ).first()
+
+                    # # Processing BensQueAFamiliaPossui section
+
+                    # if patrimonio_data is not None:
+                    #     for bens_que_a_familia_possui_data in patrimonio_data.findall('bens_que_a_familia_possui'):
+                    #         print('Processing BensQueAFamiliaPossui...')
+                    #         bens = get_text('bens', bens_que_a_familia_possui_data)
+                    #         quantidade = get_text('quantidade', bens_que_a_familia_possui_data)
+                    #         if quantidade:
+                    #             quantidade = int(quantidade)
+                    #         bens_que_a_familia_possui = BensFamilia(
+                    #             patrimonio_renda_consumo=existing_patrimonio,  # Assuming you've created an instance of PatrimonioRendaConsumo before this
+                    #             bens=bens,
+                    #             quantidade=quantidade
+                    #         )
+                    #         try:
+                    #             print('Saving BensQueAFamiliaPossui', bens_que_a_familia_possui.id)
+                    #             bens_que_a_familia_possui.save()
+                    #             print('Saving BensQueAFamiliaPossui', bens_que_a_familia_possui.id)
+                    #         except Exception as e:
+                    #             print(f"Error saving BensQueAFamiliaPossui: {e}")
+
+def processing_xml_files_with_missing_data():
+    print("Processing XML files...")
+    directory_path = "C:\Docs\consolidated"
+    
+    for filename in os.listdir(directory_path):
+        if filename.endswith('.xml'):
+            tree = ET.parse(os.path.join(directory_path, filename))
+            root = tree.getroot()
+
+            # Generic function to get text from an element
+            def get_text(element_name, parent_element=root, default=None):
+                elem = parent_element.find(element_name)
+                return elem.text if elem is not None else default
+            
+            # Extracting data for main Inquerito model
+            data_inquerito = get_text('data_inquerito')
+            hora_inquerito = get_text('hora_inquerito')
+            observacoes = get_text('observacao')
+            meta_instanceID = get_text('meta/instanceID')
+
+            # Checking if Inquerito object with similar attributes already exists
+            existing_inquerito = Inquerito.objects.filter(
+                data_inquerito=data_inquerito,
+                hora_inquerito=hora_inquerito,
+                meta_instanceID=meta_instanceID
+            ).first()
+            
+             # Processing PatrimonioRendaConsumo section
+
+            patrimonio_data = root.find('patrimonio_renda_consumo')
+            if patrimonio_data:
+                familia_possui_bens = get_text('familia_possui_bens', patrimonio_data)
+                numero_de_fontes_de_renda = get_text('numero_de_fontes_de_renda', patrimonio_data)
+                if numero_de_fontes_de_renda:
+                    numero_de_fontes_de_renda = int(numero_de_fontes_de_renda)
+                principais_fontes_de_rendas_count = get_text('principais_fontes_de_rendas_count', patrimonio_data)
+                if principais_fontes_de_rendas_count:
+                    principais_fontes_de_rendas_count = int(principais_fontes_de_rendas_count)
+                principais_fontes_de_rendas = get_text('principais_fontes_de_rendas', patrimonio_data)
+                renda_media_mensal = get_text('renda_media_mensal', patrimonio_data)
+                if familia_possui_bens:
+                    existing_patrimonio = PatrimonioRendaConsumo.objects.filter(
+                        inquerito=existing_inquerito,
+                        familia_possui_bens=familia_possui_bens,
+                        numero_de_fontes_de_renda=numero_de_fontes_de_renda,
+                        principais_fontes_de_rendas_count=principais_fontes_de_rendas_count,
+                        principais_fontes_de_rendas=principais_fontes_de_rendas,
+                        renda_media_mensal=renda_media_mensal
+                    ).first()
+            
+            if patrimonio_data is not None:
+                for bens_que_a_familia_possui_data in patrimonio_data.findall('bens_que_a_familia_possui'):
+                    print('Processing BensQueAFamiliaPossui...')
+                    bens = get_text('bens', bens_que_a_familia_possui_data)
+                    quantidade = get_text('quantidade', bens_que_a_familia_possui_data)
+                    if quantidade:
+                        quantidade = int(quantidade)
+                    bens_que_a_familia_possui = BensFamilia(
+                        patrimonio=existing_patrimonio,  # Assuming you've created an instance of PatrimonioRendaConsumo before this
+                        bens=bens,
+                        quantidade=quantidade
+                    )
+                    try:
+                        print('Saving BensQueAFamiliaPossui', bens_que_a_familia_possui.id)
+                        bens_que_a_familia_possui.save()
+                        print('Saving BensQueAFamiliaPossui', bens_que_a_familia_possui.id)
+                    except Exception as e:
+                        print(f"Error saving BensQueAFamiliaPossui: {e}")
+
+
+def query_data():
+    conn = sqlite3.connect('db.sqlite3')
+    # Define the SQL query with multiple LEFT JOINs
+    sql_query = """
+        SELECT DISTINCT i.data_inquerito, i.hora_inquerito, agg.tipo_impacto, agg.nome_proprietario, agg.codigo_familia, agg.codigo_machamba, agg.codigo_igreja
+        , agg.data_nascimento, agg.celular, agg.foto_proprietario, agg.casado, agg.nome_conjugue, agg.data_nasciment_conjugue, pc.proprietario_casa
+        , pc.tipo_doc, pc.outro_tipo_doc, pc.foto_documento, pc.bairro, pc.outro_bairro, pc.quarteirao_localizada_familia
+        , pc.rua_localizada_familia, pc.numero_casa_familia, pc.referencia_casa
+        , agg.foto_conjugue, agg.coordenadas_casa, agg.nome_inquiridor, pn.solucao_adoptar,pn.data_nascimento_prop_negocio
+        , pn.contacto_prop_negocio, pn.doc_identificacao_prop_negocio, pn.outro_doc_ident_prop_negocio
+        , pn.photo_prop_negocio, pn.bairro_vive_prop_negocio,pn.bairro_localizacao_negocio, pn.numero_senha_localizacao_negocio_gmaps
+        , pn.coordenadas_estabelecimento_comercial, pn.nome_comercial_negocio, pn.tipo_negocio, pn.outro_tipo_negocio
+        , pn.proprietario_estrutura_comercial, pn.como_conseguiu_estrutura_comercial, pn.outra_forma_conseguiu_est_comercial
+        , pn.tempo_que_possui_estrutura_comercial, pn.tem_documento_que_confirma_propriedade_estabelecimento
+        , pn.outro_doc_confirma_prop_estabelecimento, pn.foto_documento_estabelecimento, pn.tipo_material_construcao_estab_comercial_piso
+        , pn.outro_tipo_material_est_come_piso, pn.tipo_material_construcao_estab_comercial_parede, pn.outro_tipo_material_est_come_parede
+        , pn.tipo_material_construcao_estab_comercial_tecto, pn.outro_tipo_material_construcao_tecto
+        , pn.tem_trabalhadores_envolvidos_negocio, pn.numero_trabalhadores, pn.valor_inicial_investido_no_seu_negocio
+        , pn.outro_valor_inicial_no_seu_negocio, pn.rendimento_bruto_mensal_negocio, caf.lingua_materna, caf.tempo_a_familia_vive_no_talhao
+        , caf.numero_familias_talhao_terreno, caf.numero_mulheres_chefe_da_familia_tem, eh.a_casa_que_vives_e, eh.a_obra_e, eh.a_igreja_e
+        , eh.comprimento_talhao, eh.largura_talhao, eh.de_que_material_feita_vedacao_talhao, eh.outro_material_vedacao
+        , eh.quantas_estruturas_tem_o_talhao, eh.quanto_tempo_tem_casa_principal, eh.familia_tem_duat_talhao
+        , eh.familia_possui_outra_estrutura_fora_deste_talhao, eh.localizacao_outra_estrutura
+        , prc.familia_possui_bens, prc.numero_de_fontes_de_renda, prc.principais_fontes_de_rendas, prc.renda_media_mensal
+        , pec.familia_cria_animais, pec.familia_possui_arvores, rls.religiao, rls.tempo_chegar_igreja, rls.onde_enterra_entequeridos
+        , rls.familia_tem_campas, rls.frequencia_com_que_vai_cemiterio, rc.a_quem_recorre_em_caso_de_conflitos, rc.outra_fonte_a_que_recorre
+        , rc.metodo_para_receber_informacao, rc.metodo_para_dar_informacao, sp.donde_busca_agua_para_uso_na_familia
+        , sp.outro, sp.quantidade_bidoes, sp.tipo_tratamento_agua, sp.tempo_levado_para_chegar_local_agua
+        , sp.meio_transporte_para_local_recolha_energia, sp.fonte_energia_para_iluminacao_casa, sp.outra_fonte_para_iluminacao_casa
+        , sp.tempo_para_chegar_local_compra_fonte_energia, eds.existe_escola_no_bairro, eds.tem_membro_estudante, eds.quantos_membros
+        , eds.existe_centro_saude, eds.nome_centro_saude, eds.onde_procura_tratamento, eds.tempo_para_chegar_local_tratamento
+        , eds.doencas_familia_sofre_mais, exp.ao_sair_do_lugar_o_que_espera_como_compensacao
+        , exp.outra_compensacao_esperada, exp.foto_esboco_estrutura, exp.termo_consentimento
+        from core_inquerito i
+        LEFT JOIN core_identificacaoaggfamiliar agg on agg.inquerito_id=i.id 
+        LEFT JOIN core_identificacaopropnegocio pn on pn.inquerito_id=i.id
+        LEFT JOIN core_caracteristicasaggfamiliar caf on caf.inquerito_id=i.id
+        LEFT JOIN core_propriedadedacasa pc on pc.inquerito_id=i.id
+        LEFT JOIN core_estruturashabitacionais eh on eh.inquerito_id=i.id
+        LEFT JOIN core_patrimoniorendaconsumo prc on prc.inquerito_id=i.id
+        LEFT JOIN core_pecuaria pec on pec.inquerito_id=i.id
+        LEFT JOIN core_religiaoelocaissagrados rls on rls.inquerito_id=i.id
+        LEFT JOIN core_resolucaoconflitos rc on rc.inquerito_id=i.id
+        LEFT JOIN core_servicospublicos sp on sp.inquerito_id=i.id
+        LEFT JOIN core_educacaosaude eds on eds.inquerito_id=i.id
+        LEFT JOIN core_expectativastratamento exp on exp.inquerito_id=i.id
+    """
+
+    # Execute the query and fetch the results into a pandas DataFrame
+    combined_data = pd.read_sql_query(sql_query, conn)
+
+    # Save the combined data to an Excel file
+    output_file = "combined_data_final.xlsx"
+    combined_data.to_excel(output_file, index=False)  
+
+def query_membro_familia():
+    conn = sqlite3.connect('db.sqlite3')
+    # Define the SQL query with multiple LEFT JOINs
+    sql_query = """
+        SELECT i.id inquerito, agf.codigo_familia, agf.codigo_machamba, agf.codigo_igreja, mf.*
+        from core_membrofamilia mf
+        INNER JOIN core_caracteristicasaggfamiliar cag on cag.id=mf.caracteristicas_agg_familiar_id
+        INNER JOIN core_inquerito i on i.id=cag.inquerito_id
+        INNER JOIN core_identificacaoaggfamiliar agf on agf.inquerito_id=i.id
+
+    """
+
+    # Execute the query and fetch the results into a pandas DataFrame
+    combined_data = pd.read_sql_query(sql_query, conn)
+
+    # Save the combined data to an Excel file
+    output_file = "membros_familia.xlsx"
+    combined_data.to_excel(output_file, index=False)  
+
+def query_estruturas_habitacionais():
+    conn = sqlite3.connect('db.sqlite3')
+    # Define the SQL query with multiple LEFT JOINs
+    sql_query = """
+        SELECT i.id inquerito, agf.codigo_familia, agf.codigo_machamba, agf.codigo_igreja, eh.*
+        from core_estruturashabitacionais eh
+        INNER JOIN core_inquerito i on i.id=eh.inquerito_id
+        INNER JOIN core_identificacaoaggfamiliar agf on agf.inquerito_id=i.id
+
+    """
+
+    # Execute the query and fetch the results into a pandas DataFrame
+    combined_data = pd.read_sql_query(sql_query, conn)
+
+    # Save the combined data to an Excel file
+    output_file = "estruturas_habitacionais_talhaos.xlsx"
+    combined_data.to_excel(output_file, index=False)  
 
 
 @csrf_exempt  # This is to exempt the view from CSRF protection; use it only if necessary
 def index(request):
-    process_xml_files_and_upload_to_db()
-
+   # process_xml_files_and_upload_to_db()
+   # process_xml_files_insert_new_data_and_upload_to_db()
+   # query_data()
+    query_estruturas_habitacionais()
+    query_membro_familia()
     return JsonResponse({"status": "success", "message": "XML files processed successfully."})
    
